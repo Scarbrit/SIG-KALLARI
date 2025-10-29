@@ -30,7 +30,7 @@ Una **Aplicación Web Progresiva (PWA)** diseñada para la **Asociación KALLARI
 | PWA           | Workbox, Manifest, IndexedDB   |
 | Backend       | Node.js + Express              |
 | Base de datos | PostgreSQL                     |
-| Almacenamiento offline | Dexie.js (IndexedDB wrapper) |
+| Almacenamiento offline | IndexedDB wrapper |
 
 ---
 
