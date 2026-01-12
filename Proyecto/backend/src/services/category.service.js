@@ -59,7 +59,7 @@ export class CategoryProductService {
                         [
                             CategoriaProducto.sequelize.literal(`(
                                 SELECT COUNT(*) 
-                                FROM ventas.producto 
+                                FROM inventario.producto 
                                 WHERE producto.id_categoria = "CategoriaProducto"."id_categoria"
                             )`),
                             'numero_productos'
@@ -137,24 +137,6 @@ export class CategoryProductService {
 
             // 3. Retornamos los datos creados
             return categoriaProducto;
-        } catch (error) {
-            throw error;
-        }
-    }
-
-    /**
-     * Elimina una categoria
-     */
-    async deleteCategory(categoryId) {
-        try {
-            const categoria = await CategoriaProducto.findByPk(categoryId);
-            if (!categoria) {
-                throw new Error('Categoria no encontrada.');
-            }
-
-            await categoria.destroy();
-            return { message: 'Categoria eliminada correctamente.' };
-
         } catch (error) {
             throw error;
         }

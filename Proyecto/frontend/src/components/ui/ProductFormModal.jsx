@@ -1,3 +1,4 @@
+// src/components/UI/ProductFormModal.jsx
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,7 +19,6 @@ const ProductFormModal = ({
   categories = [],
 }) => {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-
   const isEditMode = !!product;
   const schema = isEditMode ? UpdateProductSchema : CreateProductSchema;
 
@@ -39,10 +39,10 @@ const ProductFormModal = ({
       precio: "",
       stock_actual: "",
       stock_minimo: "",
+      codigo_producto: "",
     },
   });
 
-  // Observar cambios en stock para validaciones dinámicas
   const stockActual = watch("stock_actual");
   const stockMinimo = watch("stock_minimo");
 
@@ -51,11 +51,10 @@ const ProductFormModal = ({
     if (stockMinimo && stockActual !== "" && stockActual !== null) {
       const stockActualNum = Number(stockActual);
       const stockMinimoNum = Number(stockMinimo);
-
       if (stockActualNum !== 0 && stockMinimoNum > stockActualNum) {
         setError("stock_minimo", {
           type: "manual",
-          message: "El stock mínimo no puede ser mayor al stock actual",
+          message: "El stock mínimo no puede ser mayor al stock actual.",
         });
       } else {
         clearErrors("stock_minimo");
@@ -63,11 +62,10 @@ const ProductFormModal = ({
     }
   }, [stockActual, stockMinimo, setError, clearErrors]);
 
-  // Resetear formulario cuando cambia el producto o se abre/cierra el modal
+  // Resetear formulario cuando cambia el producto
   useEffect(() => {
     if (isOpen) {
       if (product) {
-        // Modo edición: Rellenar datos
         reset({
           nombre: product.nombre || "",
           id_categoria:
@@ -77,15 +75,16 @@ const ProductFormModal = ({
           precio: product.precio || 0,
           stock_actual: product.stock_actual || 0,
           stock_minimo: product.stock_minimo || 0,
+          codigo_producto: product.codigo_producto || "",
         });
       } else {
-        // Modo creación: Limpiar
         reset({
           nombre: "",
           id_categoria: "",
           precio: "",
           stock_actual: "",
           stock_minimo: "",
+          codigo_producto: "",
         });
       }
     }
@@ -94,22 +93,22 @@ const ProductFormModal = ({
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     try {
-      // Conversión de tipos con validación
       const dataToSend = {
         nombre: data.nombre.trim(),
         id_categoria: Number(data.id_categoria),
         precio: Number(data.precio),
         stock_actual: Number(data.stock_actual),
         stock_minimo: Number(data.stock_minimo),
+        codigo_producto: data.codigo_producto
+          ? data.codigo_producto.trim()
+          : null,
       };
 
-      // Validación adicional antes de enviar
       if (isNaN(dataToSend.id_categoria) || dataToSend.id_categoria <= 0) {
         toast.error("Selecciona una categoría válida");
         setIsSubmitting(false);
         return;
       }
-
       if (isNaN(dataToSend.precio) || dataToSend.precio < 0) {
         toast.error("Ingresa un precio válido");
         setIsSubmitting(false);
@@ -117,20 +116,24 @@ const ProductFormModal = ({
       }
 
       const result = await onSave(dataToSend);
-
       if (result && !result.success && result.error) {
-        // Manejar errores específicos del backend
         if (result.error.includes("ya está registrado")) {
           setError("nombre", {
             type: "manual",
             message: result.error,
           });
+        } else if (result.error.includes("código de barras")) {
+          setError("codigo_producto", {
+            type: "manual",
+            message: result.error,
+          });
+        } else if (result.error.includes("stock inicial")) {
+          toast.error(result.error);
         } else {
           toast.error(result.error);
         }
         setIsSubmitting(false);
       } else {
-        // Éxito - el modal se cierra desde InventoryPage
         setIsSubmitting(false);
       }
     } catch (error) {
@@ -157,7 +160,6 @@ const ProductFormModal = ({
       >
         Cancelar
       </Button>
-
       <Button
         type="button"
         onClick={handleSubmit(onSubmit)}
@@ -204,6 +206,16 @@ const ProductFormModal = ({
           {...register("nombre")}
         />
 
+        {/* Código de Producto */}
+        <InputFieldForm
+          label="Código de Producto / Barras"
+          name="codigo_producto"
+          placeholder="Ej. ABC123-XYZ"
+          error={errors.codigo_producto?.message}
+          disabled={isSubmitting}
+          {...register("codigo_producto")}
+        />
+
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* Categoría */}
           <InputFieldForm
@@ -242,10 +254,29 @@ const ProductFormModal = ({
           />
         </div>
 
+        {/* ✅ Mostrar Stock Inicial HISTÓRICO en modo EDICIÓN (solo lectura) */}
+        {isEditMode && product?.stock_inicial !== undefined && (
+          <div className="rounded-lg bg-gray-50 dark:bg-gray-900/20 p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Stock Inicial
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Stock con el que se creó el producto (inmutable)
+                </p>
+              </div>
+              <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                {product.stock_inicial} uds.
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {/* Stock Actual */}
+          {/* ✅ Stock Inicial (crear) / Stock Actual (editar) */}
           <InputFieldForm
-            label="Stock Actual"
+            label={isEditMode ? "Stock Actual" : "Stock Inicial"}
             name="stock_actual"
             type="number"
             min="0"
@@ -283,6 +314,11 @@ const ProductFormModal = ({
             <div className="text-sm text-blue-700 dark:text-blue-300">
               <p className="font-medium mb-1">Nota sobre el stock:</p>
               <ul className="list-disc list-inside space-y-1">
+                {!isEditMode && (
+                  <li>
+                    El stock inicial se guardará automáticamente para auditoría
+                  </li>
+                )}
                 <li>
                   Si el stock llega a 0, el producto se marcará automáticamente
                   como "Agotado"
