@@ -98,11 +98,11 @@ export const CreateSaleSchema = z.object({
 // ============================================
 export const SalesHistoryFiltersSchema = z.object({
     fecha_desde: z.string()
-        .datetime({ message: 'Formato de fecha inválido' })
+        .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Formato de fecha inválido. Use YYYY-MM-DD' })
         .optional(),
 
     fecha_hasta: z.string()
-        .datetime({ message: 'Formato de fecha inválido' })
+        .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Formato de fecha inválido. Use YYYY-MM-DD' })
         .optional(),
 
     id_vendedor: z.string()

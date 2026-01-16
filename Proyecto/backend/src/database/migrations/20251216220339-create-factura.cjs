@@ -103,12 +103,12 @@ module.exports = {
         unique: true
       },
       clave_acceso_sri: {
-        type: Sequelize.STRING(50),
+        type: Sequelize.STRING(49),
         allowNull: true,
         unique: true
       },
       numero_autorizacion: {
-        type: Sequelize.STRING(50),
+        type: Sequelize.STRING(49),
         allowNull: true
       },
       fecha_emision: {

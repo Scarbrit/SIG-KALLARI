@@ -74,9 +74,9 @@ module.exports = {
 
     // 7. Valor IVA
     const valoresIva = [
-      { codigo: 'IVA_0', codigo_sri: '0', porcentaje_iva: 0, descripcion: 'IVA 0%', activo: true },
-      { codigo: 'IVA_12', codigo_sri: '2', porcentaje_iva: 12, descripcion: 'IVA 12%', activo: false },
-      { codigo: 'IVA_15', codigo_sri: '4', porcentaje_iva: 15, descripcion: 'IVA 15%', activo: true }
+      { codigo: 'IVA_0', porcentaje_iva: 0, descripcion: 'IVA 0%', activo: true },
+      { codigo: 'IVA_12', porcentaje_iva: 12, descripcion: 'IVA 12%', activo: false },
+      { codigo: 'IVA_15', porcentaje_iva: 15, descripcion: 'IVA 15%', activo: true }
     ];
     for (const v of valoresIva) {
       await queryInterface.bulkInsert({ tableName: 'valor_iva', schema: 'catalogo' }, [v], { ignoreDuplicates: true });

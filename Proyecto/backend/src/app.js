@@ -15,6 +15,11 @@ import ivaRoutes from './routes/iva.routes.js';
 import discountRoutes from './routes/discount.routes.js';
 import locationRoutes from './routes/location.routes.js';
 import certicateRoutes from './routes/certificate.routes.js';
+// Nuevas rutas del módulo de contabilidad
+import proveedorRoutes from './routes/proveedor.routes.js';
+import cuentaPorPagarRoutes from './routes/cuentaPorPagar.routes.js';
+import cuentaBancariaRoutes from './routes/cuentaBancaria.routes.js';
+import contabilidadRoutes from './routes/contabilidad.routes.js';
 
 const app = express();
 
@@ -33,7 +38,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/category-product', categoryRoutes);
-app.use('/api/roles', roleRoutes); 
+app.use('/api/roles', roleRoutes);
 app.use('/api/user-settings', userSettingsRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -43,5 +48,10 @@ app.use('/api/taxes', ivaRoutes);
 app.use('/api/discounts', discountRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/certificates', certicateRoutes);
+// Nuevas rutas del módulo de contabilidad
+app.use('/api/proveedores', proveedorRoutes);
+app.use('/api/cuentas-por-pagar', cuentaPorPagarRoutes);
+app.use('/api/cuentas-bancarias', cuentaBancariaRoutes);
+app.use('/api/contabilidad', contabilidadRoutes);
 
 export default app;

@@ -6,7 +6,7 @@ import forge from 'node-forge';
 import fs from 'fs/promises';
 import moment from 'moment';
 import axios from 'axios';
-import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
+import FormData from 'form-data';
 import { ConfiguracionSri, Factura, Cliente, DetalleFactura, Producto, ValorIva, CertificadoDigital, ClienteIdentificacion, TipoIdentificacion } from '../models/index.js';
 import { CertificateService } from './certificate.service.js';
 
@@ -58,11 +58,8 @@ export class SriService {
         }
 
         const residuo = suma % 11;
-        let resultado = 11 - residuo;
-
-        if (resultado === 11) return 0;
-        if (resultado === 10) return 1;
-        return resultado;
+        const digito = residuo === 0 ? 0 : 11 - residuo;
+        return digito === 11 ? 0 : digito;
     }
 
     // ============================================
@@ -93,12 +90,8 @@ export class SriService {
                     as: 'DetalleFactura',
                     include: [
                         { model: Producto, attributes: ['codigo_producto', 'nombre', 'precio'] },
-                        { model: ValorIva, attributes: ['codigo', 'codigo_sri', 'porcentaje_iva'] }
+                        { model: ValorIva, attributes: ['codigo', 'porcentaje_iva'] }
                     ]
-                },
-                {
-                    model: ValorIva,
-                    attributes: ['codigo', 'codigo_sri', 'porcentaje_iva']
                 }
             ]
         });
@@ -145,8 +138,8 @@ export class SriService {
                     identificacion.length === 13 ? '04' : '06';
         }
 
-        // Generar clave de acceso si no existe o si es inválida (longitud incorrecta)
-        if (!factura.clave_acceso_sri || factura.clave_acceso_sri.length !== 49) {
+        // Generar clave de acceso si no existe
+        if (!factura.clave_acceso_sri) {
             const [est, pe, sec] = factura.secuencial.split('-');
             const codigoNumerico = Math.floor(10000000 + Math.random() * 90000000).toString();
 
@@ -206,7 +199,7 @@ export class SriService {
         if (parseFloat(factura.subtotal_con_iva) > 0) {
             const totalImpuesto = totalConImpuestos.ele('totalImpuesto');
             totalImpuesto.ele('codigo').txt('2');
-            totalImpuesto.ele('codigoPorcentaje').txt(factura.ValorIva.codigo_sri);
+            totalImpuesto.ele('codigoPorcentaje').txt('2');
             totalImpuesto.ele('baseImponible').txt(parseFloat(factura.subtotal_con_iva).toFixed(2));
             totalImpuesto.ele('valor').txt(parseFloat(factura.total_iva).toFixed(2));
         }
@@ -235,7 +228,7 @@ export class SriService {
             const impuestos = detalle.ele('impuestos');
             const impuesto = impuestos.ele('impuesto');
             impuesto.ele('codigo').txt('2');
-            impuesto.ele('codigoPorcentaje').txt(det.ValorIva.codigo_sri);
+            impuesto.ele('codigoPorcentaje').txt(det.ValorIva.codigo);
             impuesto.ele('tarifa').txt(det.ValorIva.porcentaje_iva.toString());
             const baseImponible = parseFloat(det.subtotal);
             const valorIva = baseImponible * (parseFloat(det.ValorIva.porcentaje_iva) / 100);
@@ -246,40 +239,44 @@ export class SriService {
         const infoAdicional = root.ele('infoAdicional');
         infoAdicional.ele('campoAdicional', { nombre: 'Email' }).txt(cliente.email);
 
-        return root.end({ prettyPrint: false });
+        return root.end({ prettyPrint: true });
     }
 
     // ============================================
     // FIRMAR XML - SIMPLIFICADO (sin parámetros)
     // ============================================
     async firmarXml(xmlString) {
+        // MODO MOCK
         if (this.modoMock) {
             console.log('🧪 MOCK: Simulando firma digital...');
             return xmlString.replace(
                 '</factura>',
                 `<!-- FIRMA SIMULADA (MODO PRUEBA) -->
-            <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
-                <ds:SignatureValue>MOCK_SIGNATURE_${Date.now()}</ds:SignatureValue>
-            </ds:Signature>
-            </factura>`
+                <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+                    <ds:SignatureValue>MOCK_SIGNATURE_${Date.now()}</ds:SignatureValue>
+                </ds:Signature>
+                </factura>`
             );
         }
 
         try {
             let p12Buffer, password;
 
+            // MODO BASE DE DATOS - BUSCA EL CERTIFICADO ACTIVO
             if (this.useDbCertificates) {
+                // ✅ SIMPLIFICADO: Buscar el único certificado activo
                 const cert = await CertificadoDigital.findOne({
                     where: { activo: true },
                     order: [['fecha_expiracion', 'DESC']]
                 });
 
                 if (!cert) {
-                    throw new Error('No hay ningún certificado activo.');
+                    throw new Error('No hay ningún certificado activo. Sube uno desde el panel de administración.');
                 }
 
+                // Verificar que no esté expirado
                 if (new Date() > cert.fecha_expiracion) {
-                    throw new Error(`Certificado expirado el ${cert.fecha_expiracion.toLocaleDateString()}.`);
+                    throw new Error(`Certificado expirado el ${cert.fecha_expiracion.toLocaleDateString()}. Por favor, sube uno nuevo.`);
                 }
 
                 const certData = await this.certificateService.getCertificateForSigning(cert.id_certificado);
@@ -287,17 +284,25 @@ export class SriService {
                 password = certData.password;
 
                 console.log(`✅ Usando certificado: ${cert.nombre} (Expira: ${cert.fecha_expiracion.toLocaleDateString()})`);
-            } else {
+            }
+            // MODO ARCHIVO ESTÁTICO
+            else {
                 const certPath = process.env.CERTIFICADO_PATH;
-                if (!certPath) throw new Error('CERTIFICADO_PATH no configurado');
+                if (!certPath) {
+                    throw new Error('CERTIFICADO_PATH no configurado en .env');
+                }
 
                 p12Buffer = await fs.readFile(certPath);
                 password = process.env.CERTIFICADO_PASSWORD;
 
-                if (!password) throw new Error('CERTIFICADO_PASSWORD no configurado');
+                if (!password) {
+                    throw new Error('CERTIFICADO_PASSWORD no configurado en .env');
+                }
+
+                console.log('✅ Usando certificado desde archivo estático');
             }
 
-            // Cargar certificado
+            // Firmar con forge (código igual)
             const p12Asn1 = forge.asn1.fromDer(p12Buffer.toString('binary'));
             const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
 
@@ -307,68 +312,28 @@ export class SriService {
             const cert = certBags[forge.pki.oids.certBag][0].cert;
             const privateKey = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag][0].key;
 
-            // Parsear XML
-            const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
+            const md = forge.md.sha256.create();
+            md.update(xmlString, 'utf8');
+            const signature = privateKey.sign(md);
 
-            // ✅ CALCULAR DIGEST DEL DOCUMENTO COMPLETO (para Reference #comprobante)
-            const mdDoc = forge.md.sha1.create();
-            mdDoc.update(xmlString, 'utf8');
-            const digestDocumento = forge.util.encode64(mdDoc.digest().bytes());
-
-            // ✅ OBTENER INFO DEL CERTIFICADO
-            const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes();
-            const certBase64 = forge.util.encode64(certDer);
-
-            // Calcular digest del certificado
-            const mdCert = forge.md.sha1.create();
-            mdCert.update(certDer, 'raw');
-            const digestCertificado = forge.util.encode64(mdCert.digest().bytes());
-
-            // SRI requiere serialNumber en DECIMAL
-            const serialNumber = BigInt('0x' + cert.serialNumber).toString();
-
-            // Reconstruir issuer con el formato esperado por SRI
-            const issuer = cert.issuer.attributes
-                .reverse()
-                .map(attr => `${attr.shortName || attr.name}=${attr.value}`)
-                .join(',');
-
-            // SRI requiere formato ISO sin 'Z', con offset o solo fecha/hora
-            const now = new Date();
-            const offset = -now.getTimezoneOffset();
-            const sign = offset >= 0 ? '+' : '-';
-            const pad = (num) => String(num).padStart(2, '0');
-            const signingTime = now.getFullYear() +
-                '-' + pad(now.getMonth() + 1) +
-                '-' + pad(now.getDate()) +
-                'T' + pad(now.getHours()) +
-                ':' + pad(now.getMinutes()) +
-                ':' + pad(now.getSeconds()) +
-                sign + pad(Math.floor(Math.abs(offset) / 60)) +
-                ':' + pad(Math.abs(offset) % 60);
-
-            // ✅ CONSTRUIR SignedProperties (XAdES-BES)
-            const signedPropertiesXml = `<etsi:SignedProperties Id="Signature-SignedProperties" xmlns:etsi="http://uri.etsi.org/01903/v1.3.2#"><etsi:SignedSignatureProperties><etsi:SigningTime>${signingTime}</etsi:SigningTime><etsi:SigningCertificate><etsi:Cert><etsi:CertDigest><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod><ds:DigestValue>${digestCertificado}</ds:DigestValue></etsi:CertDigest><etsi:IssuerSerial><ds:X509IssuerName>${issuer}</ds:X509IssuerName><ds:X509SerialNumber>${serialNumber}</ds:X509SerialNumber></etsi:IssuerSerial></etsi:Cert></etsi:SigningCertificate></etsi:SignedSignatureProperties><etsi:SignedDataObjectProperties><etsi:DataObjectFormat ObjectReference="#Reference-ID"><etsi:Description>contenido comprobante</etsi:Description><etsi:MimeType>text/xml</etsi:MimeType></etsi:DataObjectFormat></etsi:SignedDataObjectProperties></etsi:SignedProperties>`;
-
-            // Calcular digest de SignedProperties
-            const mdSignedProps = forge.md.sha1.create();
-            mdSignedProps.update(signedPropertiesXml, 'utf8');
-            const digestSignedProperties = forge.util.encode64(mdSignedProps.digest().bytes());
-
-            // ✅ CONSTRUIR SignedInfo
-            const signedInfoXml = `<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:etsi="http://uri.etsi.org/01903/v1.3.2#"><ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></ds:CanonicalizationMethod><ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></ds:SignatureMethod><ds:Reference Id="Reference-ID" URI="#comprobante"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></ds:Transform></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod><ds:DigestValue>${digestDocumento}</ds:DigestValue></ds:Reference><ds:Reference Type="http://uri.etsi.org/01903#SignedProperties" URI="#Signature-SignedProperties"><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod><ds:DigestValue>${digestSignedProperties}</ds:DigestValue></ds:Reference></ds:SignedInfo>`;
-
-            // ✅ FIRMAR EL SignedInfo
-            const mdSignedInfo = forge.md.sha1.create();
-            mdSignedInfo.update(signedInfoXml, 'utf8');
-            const signature = privateKey.sign(mdSignedInfo);
             const signatureBase64 = forge.util.encode64(signature);
+            const certBase64 = forge.util.encode64(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes());
 
-            // ✅ CONSTRUIR LA FIRMA COMPLETA
-            const signatureXml = `<ds:Signature Id="Signature" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:etsi="http://uri.etsi.org/01903/v1.3.2#">${signedInfoXml}<ds:SignatureValue Id="SignatureValue">${signatureBase64}</ds:SignatureValue><ds:KeyInfo Id="Certificate"><ds:X509Data><ds:X509Certificate>${certBase64}</ds:X509Certificate></ds:X509Data></ds:KeyInfo><ds:Object Id="Signature-Object"><etsi:QualifyingProperties Target="#Signature">${signedPropertiesXml}</etsi:QualifyingProperties></ds:Object></ds:Signature>`;
-
-            // Insertar firma antes del cierre de </factura>
-            const xmlFirmado = xmlString.replace('</factura>', signatureXml + '\n</factura>');
+            const xmlFirmado = xmlString.replace(
+                '</factura>',
+                `<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+                    <ds:SignedInfo>
+                        <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+                    </ds:SignedInfo>
+                    <ds:SignatureValue>${signatureBase64}</ds:SignatureValue>
+                    <ds:KeyInfo>
+                        <ds:X509Data>
+                            <ds:X509Certificate>${certBase64}</ds:X509Certificate>
+                        </ds:X509Data>
+                    </ds:KeyInfo>
+                </ds:Signature>
+                </factura>`
+            );
 
             // Limpiar memoria
             if (p12Buffer) {
@@ -435,51 +400,30 @@ export class SriService {
         }
 
         const config = await ConfiguracionSri.findOne({ where: { activo: true } });
-        const xmlBase64 = Buffer.from(xmlFirmado).toString('base64');
-
-        // SRI Recepción requiere un sobre SOAP con el contenido en Base64
-        const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ec="http://ec.gob.sri.ws.recepcion">
-    <soapenv:Header/>
-    <soapenv:Body>
-        <ec:validarComprobante>
-            <xml>${xmlBase64}</xml>
-        </ec:validarComprobante>
-    </soapenv:Body>
-</soapenv:Envelope>`;
+        const formData = new FormData();
+        formData.append('xml', Buffer.from(xmlFirmado), {
+            filename: 'comprobante.xml',
+            contentType: 'text/xml'
+        });
 
         try {
-            const response = await axios.post(config.url_recepcion, soapEnvelope, {
-                headers: {
-                    'Content-Type': 'text/xml; charset=utf-8',
-                    'SOAPAction': ''
-                },
+            const response = await axios.post(config.url_recepcion, formData, {
+                headers: formData.getHeaders(),
                 timeout: 30000
             });
 
-            const responseData = response.data;
-            let estado = 'ERROR';
-
-            if (responseData.includes('<estado>RECIBIDA</estado>')) {
-                estado = 'RECIBIDA';
-            } else if (responseData.includes('<estado>DEVUELTA</estado>')) {
-                estado = 'DEVUELTA';
-            }
-
             return {
-                estado,
-                mensaje: responseData
+                estado: response.data.includes('RECIBIDA') ? 'RECIBIDA' : 'ERROR',
+                mensaje: response.data
             };
         } catch (error) {
-            console.error('❌ Error en axios.post al SRI:', error.response?.data || error.message);
-            throw new Error(`Error enviando al SRI: ${error.response?.data || error.message}`);
+            throw new Error(`Error enviando al SRI: ${error.message}`);
         }
     }
 
     // ============================================
     // CONSULTAR AUTORIZACIÓN
     // ============================================
-    // services/sri.service.js
     async consultarAutorizacion(claveAcceso) {
         if (this.modoMock) {
             console.log('🧪 MOCK: Simulando autorización...');
@@ -494,134 +438,31 @@ export class SriService {
 
         const config = await ConfiguracionSri.findOne({ where: { activo: true } });
 
-        const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
-                  xmlns:ec="http://ec.gob.sri.ws.autorizacion">
-    <soapenv:Header/>
-    <soapenv:Body>
-        <ec:autorizacionComprobante>
-            <claveAccesoComprobante>${claveAcceso}</claveAccesoComprobante>
-        </ec:autorizacionComprobante>
-    </soapenv:Body>
-</soapenv:Envelope>`;
-
         try {
-            console.log('📞 Consultando autorización al SRI...');
-            console.log('   Clave de acceso:', claveAcceso);
-            console.log('   URL:', config.url_autorizacion);
-
             const response = await axios.post(
                 config.url_autorizacion,
-                soapEnvelope,
+                `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                    <soap:Body>
+                        <autorizacionComprobante>
+                            <claveAccesoComprobante>${claveAcceso}</claveAccesoComprobante>
+                        </autorizacionComprobante>
+                    </soap:Body>
+                </soap:Envelope>`,
                 {
-                    headers: {
-                        'Content-Type': 'text/xml; charset=utf-8',
-                        'SOAPAction': ''
-                    },
-                    timeout: 60000 // Aumentar timeout a 60 segundos
+                    headers: { 'Content-Type': 'text/xml' },
+                    timeout: 30000
                 }
             );
 
-            const respuestaTexto = response.data;
-            console.log('📄 Respuesta recibida del SRI (primeros 500 chars):', respuestaTexto.substring(0, 500));
-
-            // Analizar respuesta
-            const autorizado = respuestaTexto.includes('<estado>AUTORIZADO</estado>');
-            const noAutorizado = respuestaTexto.includes('<estado>NO AUTORIZADO</estado>');
-            const rechazado = respuestaTexto.includes('<estado>RECHAZADO</estado>');
-
-            if (autorizado) {
-                // Extraer número y fecha de autorización
-                const numeroMatch = respuestaTexto.match(/<numeroAutorizacion>(.*?)<\/numeroAutorizacion>/);
-                const fechaMatch = respuestaTexto.match(/<fechaAutorizacion>(.*?)<\/fechaAutorizacion>/);
-
-                return {
-                    autorizado: true,
-                    numeroAutorizacion: numeroMatch ? numeroMatch[1] : claveAcceso,
-                    fechaAutorizacion: fechaMatch ? new Date(fechaMatch[1]) : new Date(),
-                    xmlRespuesta: respuestaTexto
-                };
-            } else if (noAutorizado || rechazado) {
-                const mensajeError = this.extraerErrorDeRespuesta(respuestaTexto);
-                console.warn('⚠️ Comprobante NO autorizado:', mensajeError);
-
-                return {
-                    autorizado: false,
-                    numeroAutorizacion: null,
-                    fechaAutorizacion: null,
-                    xmlRespuesta: respuestaTexto,
-                    mensajeError
-                };
-            } else {
-                // Estado desconocido o respuesta inesperada
-                console.warn('⚠️ Respuesta inesperada del SRI');
-                return {
-                    autorizado: false,
-                    numeroAutorizacion: null,
-                    fechaAutorizacion: null,
-                    xmlRespuesta: respuestaTexto,
-                    mensajeError: 'Respuesta no reconocida del SRI'
-                };
-            }
-
+            const autorizado = response.data.includes('AUTORIZADO');
+            return {
+                autorizado,
+                numeroAutorizacion: autorizado ? claveAcceso : null,
+                fechaAutorizacion: autorizado ? new Date() : null,
+                xmlRespuesta: response.data
+            };
         } catch (error) {
-            console.error('❌ Error consultando autorización:');
-            console.error('   Mensaje:', error.message);
-
-            if (error.response) {
-                console.error('   Status:', error.response.status);
-                console.error('   Data:', error.response.data?.substring(0, 500));
-            }
-
             throw new Error(`Error consultando autorización: ${error.message}`);
-        }
-    }
-
-    // ============================================
-    // EXTRAER ERRORES DEL XML DE RESPUESTA
-    // ============================================
-    extraerErrorDeRespuesta(xmlRespuesta) {
-        if (!xmlRespuesta) return 'Respuesta vacía del SRI';
-
-        try {
-            const mensajes = [];
-
-            // Buscar todos los bloques de <mensaje>
-            const regexMensaje = /<mensaje>([\s\S]*?)<\/mensaje>/g;
-            let match;
-
-            while ((match = regexMensaje.exec(xmlRespuesta)) !== null) {
-                let contenido = match[1].trim();
-
-                // Si el contenido tiene a su vez una etiqueta <mensaje> (anidamiento del SRI), 
-                // intentamos extraer el texto interno.
-                const interna = contenido.match(/<mensaje>([\s\S]*?)<\/mensaje>/);
-                let texto = interna ? interna[1].trim() : contenido;
-
-                // Limpiar etiquetas HTML/XML residuales y recortar espacios
-                texto = texto.replace(/<[^>]*>?/gm, '').trim();
-
-                if (texto && !mensajes.includes(texto)) {
-                    mensajes.push(texto);
-                }
-            }
-
-            const infoAdicionalMatch = xmlRespuesta.match(/<informacionAdicional>([\s\S]*?)<\/informacionAdicional>/);
-            if (infoAdicionalMatch) {
-                let info = infoAdicionalMatch[1].replace(/<[^>]*>?/gm, '').trim();
-                if (info && !mensajes.includes(info)) {
-                    mensajes.push(`Detalle: ${info}`);
-                }
-            }
-
-            if (mensajes.length === 0) {
-                return 'No se encontraron detalles de error en la respuesta del SRI';
-            }
-
-            return mensajes.join(' | ');
-        } catch (error) {
-            console.error('Error al extraer detalles del XML:', error);
-            return 'Error procesando los detalles técnicos de la respuesta';
         }
     }
 }

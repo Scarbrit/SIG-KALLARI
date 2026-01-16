@@ -277,13 +277,14 @@ export class SalesService {
 
     async _procesarSriAsync(idFactura) {
         try {
-            console.log(`🔄 Iniciando proceso SRI para factura ${idFactura}...`);
-
             const xml = await this.sriService.generarXmlFactura(idFactura);
-            console.log('✅ XML generado');
 
-            const xmlFirmado = await this.sriService.firmarXml(xml);
-            console.log('✅ XML firmado');
+            const config = await ConfiguracionSri.findOne({ where: { activo: true } });
+            const xmlFirmado = await this.sriService.firmarXml(
+                xml,
+                config.certificado_path,
+                config.certificado_password
+            );
 
             const factura = await Factura.findByPk(idFactura);
             const nombreArchivo = `facturas/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${factura.secuencial}.xml`;
@@ -298,7 +299,6 @@ export class SalesService {
                     tags: ['factura', 'xml', new Date().getFullYear().toString()]
                 }
             );
-            console.log('✅ XML subido a Cloudinary:', urlXml);
 
             const estadoFirmado = await EstadoSri.findOne({ where: { codigo: 'SRI_FIRMADO' } });
             await factura.update({
@@ -306,160 +306,48 @@ export class SalesService {
                 id_estado_sri: estadoFirmado.id_estado_sri
             });
 
-            console.log('📤 Enviando al SRI...');
             const respuesta = await this.sriService.enviarAlSri(xmlFirmado);
-            console.log('📨 Respuesta del SRI:', respuesta.estado);
 
-            // Siempre guardar la respuesta del SRI
-            await factura.update({ xml_respuesta_sri: respuesta.mensaje });
-
-            if (respuesta.estado === 'RECIBIDA' || respuesta.estado === 'DEVUELTA') {
-                const estadoCodigo = respuesta.estado === 'RECIBIDA' ? 'SRI_RECIBIDA' : 'SRI_DEVUELTA';
-                const estado = await EstadoSri.findOne({ where: { codigo: estadoCodigo } });
-
-                if (estado) {
-                    await factura.update({
-                        id_estado_sri: estado.id_estado_sri
-                    });
-                }
-
-                console.log('⏳ Iniciando consulta de autorización con reintentos automáticos...');
+            if (respuesta.estado === 'RECIBIDA') {
+                const estadoRecibida = await EstadoSri.findOne({ where: { codigo: 'SRI_RECIBIDA' } });
+                await factura.update({
+                    id_estado_sri: estadoRecibida.id_estado_sri,
+                    xml_respuesta_sri: respuesta.mensaje
+                });
 
                 setTimeout(async () => {
-                    await this._verificarAutorizacion(idFactura, 0, 5);
-                }, 15000); // ✅ Cambiar de 10000 a 15000 (15 segundos)
-
-            } else {
-                // Rechazado inmediatamente
-                const estadoRechazado = await EstadoSri.findOne({ where: { codigo: 'SRI_RECHAZADO' } });
-                const mensajeError = this.sriService.extraerErrorDeRespuesta(respuesta.mensaje);
-                await factura.update({
-                    id_estado_sri: estadoRechazado.id_estado_sri,
-                    mensaje_sri: mensajeError || 'Error inesperado al enviar al SRI'
-                });
-                console.log('❌ Comprobante RECHAZADO por el SRI');
+                    await this._verificarAutorizacion(idFactura);
+                }, 2000);
             }
-
         } catch (error) {
-            console.error('❌ Error en proceso SRI:', error.message);
-            console.error('Stack:', error.stack);
-
+            console.error('Error en proceso SRI:', error);
             const estadoRechazado = await EstadoSri.findOne({ where: { codigo: 'SRI_RECHAZADO' } });
-
-            if (estadoRechazado) {
-                await Factura.update(
-                    {
-                        id_estado_sri: estadoRechazado.id_estado_sri,
-                        mensaje_sri: error.message
-                    },
-                    { where: { id_factura: idFactura } }
-                );
-            }
+            await Factura.update(
+                {
+                    id_estado_sri: estadoRechazado.id_estado_sri,
+                    mensaje_sri: error.message
+                },
+                { where: { id_factura: idFactura } }
+            );
         }
     }
 
-    async _verificarAutorizacion(idFactura, intentos = 0, maxIntentos = 5) {
+    async _verificarAutorizacion(idFactura) {
         try {
-            console.log(`🔍 Verificando autorización para factura ${idFactura} (intento ${intentos + 1}/${maxIntentos})...`);
-
             const factura = await Factura.findByPk(idFactura);
-
-            if (!factura) {
-                console.error('❌ Factura no encontrada');
-                return;
-            }
-
-            if (!factura.clave_acceso_sri) {
-                console.error('❌ Factura sin clave de acceso');
-                return;
-            }
-
             const resultado = await this.sriService.consultarAutorizacion(factura.clave_acceso_sri);
 
             if (resultado.autorizado) {
-                console.log('✅ Comprobante AUTORIZADO');
-
                 const estadoAutorizado = await EstadoSri.findOne({ where: { codigo: 'SRI_AUTORIZADO' } });
-
-                if (!estadoAutorizado) {
-                    console.error('❌ Estado SRI_AUTORIZADO no encontrado en BD');
-                    return;
-                }
-
                 await factura.update({
                     id_estado_sri: estadoAutorizado.id_estado_sri,
                     numero_autorizacion: resultado.numeroAutorizacion,
                     fecha_autorizacion: resultado.fechaAutorizacion,
                     xml_respuesta_sri: resultado.xmlRespuesta
                 });
-
-                console.log(`✅ Factura ${factura.secuencial} autorizada correctamente`);
-
-            } else {
-                // ✅ Verificar diferentes estados de procesamiento
-                const enProcesamiento = resultado.xmlRespuesta?.includes('EN PROCESAMIENTO') ||
-                    resultado.xmlRespuesta?.includes('CLAVE DE ACCESO EN PROCESAMIENTO') ||
-                    resultado.xmlRespuesta?.includes('<numeroComprobantes>0</numeroComprobantes>'); // ✅ AGREGADO
-
-                if (enProcesamiento && intentos < maxIntentos) {
-                    // ✅ Reintentar con backoff exponencial
-                    const tiempoEspera = Math.min(10000 * Math.pow(2, intentos), 60000); // Máximo 60 segundos
-                    console.log(`⏳ Comprobante en procesamiento (no encontrado aún). Reintentando en ${tiempoEspera / 1000}s...`);
-
-                    setTimeout(async () => {
-                        await this._verificarAutorizacion(idFactura, intentos + 1, maxIntentos);
-                    }, tiempoEspera);
-
-                } else if (intentos >= maxIntentos) {
-                    // ✅ Máximo de reintentos alcanzado
-                    console.warn(`⚠️ Máximo de reintentos alcanzado para factura ${idFactura}`);
-                    console.log('💡 El comprobante seguirá procesándose en el SRI. Puedes consultarlo manualmente más tarde.');
-
-                    // Mantener el estado actual (RECIBIDA o DEVUELTA)
-                    await factura.update({
-                        mensaje_sri: 'Comprobante en procesamiento en el SRI. Consultar manualmente más tarde.'
-                    });
-
-                } else {
-                    // ✅ NO autorizado (rechazado definitivamente)
-                    console.warn('⚠️ Comprobante NO autorizado definitivamente');
-
-                    const estadoRechazado = await EstadoSri.findOne({ where: { codigo: 'SRI_RECHAZADO' } });
-
-                    if (estadoRechazado) {
-                        await factura.update({
-                            id_estado_sri: estadoRechazado.id_estado_sri,
-                            mensaje_sri: resultado.mensajeError || 'No autorizado por el SRI',
-                            xml_respuesta_sri: resultado.xmlRespuesta
-                        });
-                    }
-                }
             }
-
         } catch (error) {
-            console.error('❌ Error verificando autorización:', error.message);
-
-            // ✅ Reintentar en caso de error de red (si no hemos alcanzado el máximo)
-            if (intentos < maxIntentos) {
-                const tiempoEspera = 10000; // 10 segundos
-                console.log(`⏳ Error temporal. Reintentando en ${tiempoEspera / 1000}s...`);
-
-                setTimeout(async () => {
-                    await this._verificarAutorizacion(idFactura, intentos + 1, maxIntentos);
-                }, tiempoEspera);
-            } else {
-                // Registrar el error en la factura
-                try {
-                    await Factura.update(
-                        {
-                            mensaje_sri: `Error verificando autorización: ${error.message}`
-                        },
-                        { where: { id_factura: idFactura } }
-                    );
-                } catch (updateError) {
-                    console.error('Error actualizando mensaje de error:', updateError);
-                }
-            }
+            console.error('Error verificando autorización:', error);
         }
     }
 
@@ -487,7 +375,7 @@ export class SalesService {
                 },
                 {
                     model: Usuario,
-                    as: 'Usuario',
+                    as: 'vendedor',
                     attributes: ['id_usuario', 'nombre', 'apellido', 'email']
                 },
                 {
@@ -567,8 +455,8 @@ export class SalesService {
         const { fecha_desde, fecha_hasta, id_vendedor, id_estado_sri, tipo_venta, limit = 50 } = filtros;
 
         const where = {};
-        if (fecha_desde) where.fecha_emision = { [sequelize.Sequelize.Op.gte]: fecha_desde };
-        if (fecha_hasta) where.fecha_emision = { ...where.fecha_emision, [sequelize.Sequelize.Op.lte]: fecha_hasta };
+        if (fecha_desde) where.fecha_emision = { [Op.gte]: fecha_desde };
+        if (fecha_hasta) where.fecha_emision = { ...where.fecha_emision, [Op.lte]: fecha_hasta };
         if (id_vendedor) where.id_vendedor = id_vendedor;
         if (id_estado_sri) where.id_estado_sri = id_estado_sri;
         if (tipo_venta) where.tipo_venta = tipo_venta;
@@ -587,7 +475,7 @@ export class SalesService {
                         }
                     ]
                 },
-                { model: Usuario, as: 'Usuario', attributes: ['nombre', 'apellido'] },
+                { model: Usuario, as: 'vendedor', attributes: ['nombre', 'apellido'] },
                 { model: EstadoSri, attributes: ['estado_sri', 'codigo'] },
                 { model: MetodoPago, attributes: ['metodo_pago', 'codigo_sri'] }
             ],

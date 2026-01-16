@@ -38,6 +38,15 @@ import CuentaPorCobrarModel from './contabilidad/CuentaPorCobrar.js';
 import PagoCuentaCobrarModel from './contabilidad/PagoCuentaCobrar.js';
 import ClienteIdentificacionModel from './ventas/ClienteIdentificacion.js';
 import EstadoClienteModel from './catalogo/EstadoCliente.js';
+// Nuevos modelos para contabilidad completa
+import TipoCuentaBancariaModel from './catalogo/TipoCuentaBancaria.js';
+import EstadoProveedorModel from './catalogo/EstadoProveedor.js';
+import ProveedorModel from './contabilidad/Proveedor.js';
+import CuentaPorPagarModel from './contabilidad/CuentaPorPagar.js';
+import PagoCuentaPagarModel from './contabilidad/PagoCuentaPagar.js';
+import PeriodoContableModel from './contabilidad/PeriodoContable.js';
+import CuentaBancariaModel from './contabilidad/CuentaBancaria.js';
+import MovimientoCajaBancoModel from './contabilidad/MovimientoCajaBanco.js';
 
 // 3. Inicializa cada modelo
 const AsientoContable = AsientoContableModel(sequelize, DataTypes);
@@ -74,6 +83,15 @@ const CuentaPorCobrar = CuentaPorCobrarModel(sequelize, DataTypes);
 const PagoCuentaCobrar = PagoCuentaCobrarModel(sequelize, DataTypes);
 const ClienteIdentificacion = ClienteIdentificacionModel(sequelize, DataTypes);
 const EstadoCliente = EstadoClienteModel(sequelize, DataTypes);
+// Nuevos modelos inicializados
+const TipoCuentaBancaria = TipoCuentaBancariaModel(sequelize, DataTypes);
+const EstadoProveedor = EstadoProveedorModel(sequelize, DataTypes);
+const Proveedor = ProveedorModel(sequelize, DataTypes);
+const CuentaPorPagar = CuentaPorPagarModel(sequelize, DataTypes);
+const PagoCuentaPagar = PagoCuentaPagarModel(sequelize, DataTypes);
+const PeriodoContable = PeriodoContableModel(sequelize, DataTypes);
+const CuentaBancaria = CuentaBancariaModel(sequelize, DataTypes);
+const MovimientoCajaBanco = MovimientoCajaBancoModel(sequelize, DataTypes);
 
 // 4. Agrupa todos los modelos en un objeto
 // Esto permite que el bucle de asociaciones funcione
@@ -111,7 +129,16 @@ const models = {
     CuentaPorCobrar,
     PagoCuentaCobrar,
     ClienteIdentificacion,
-    EstadoCliente
+    EstadoCliente,
+    // Nuevos modelos
+    TipoCuentaBancaria,
+    EstadoProveedor,
+    Proveedor,
+    CuentaPorPagar,
+    PagoCuentaPagar,
+    PeriodoContable,
+    CuentaBancaria,
+    MovimientoCajaBanco
 };
 
 // 5. Ejecuta el método .associate() de cada modelo (si existe)
@@ -157,7 +184,16 @@ export {
     CuentaPorCobrar,
     PagoCuentaCobrar,
     ClienteIdentificacion,
-    EstadoCliente
+    EstadoCliente,
+    // Nuevos modelos exportados
+    TipoCuentaBancaria,
+    EstadoProveedor,
+    Proveedor,
+    CuentaPorPagar,
+    PagoCuentaPagar,
+    PeriodoContable,
+    CuentaBancaria,
+    MovimientoCajaBanco
 };
 
 // Exporta también la instancia de conexión de sequelize

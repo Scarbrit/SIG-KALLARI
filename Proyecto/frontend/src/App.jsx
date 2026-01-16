@@ -24,6 +24,11 @@ import AdminSettingsPage from "./pages/Admin/SettingsPage";
 import DiscountPage from "./pages/Admin/DiscountPage";
 import IvaPage from "./pages/Admin/IvaPage";
 import CertificatesPage from "./pages/Admin/CertificatesPage";
+import SriConfigPage from "./pages/Admin/SriConfigPage";
+import ProveedoresPage from "./pages/Admin/ProveedoresPage";
+import CuentasPorPagarPage from "./pages/Admin/CuentasPorPagarPage";
+import CuentasBancariasPage from "./pages/Admin/CuentasBancariasPage";
+import ContabilidadPage from "./pages/Admin/ContabilidadPage";
 
 // Pages Vendedor
 import SellerDashboardPage from "./pages/SellerDashboardPage";
@@ -31,8 +36,12 @@ import SellerSettingsPage from "./pages/Seller/SettingsPage";
 import InventoryPage from "./pages/Seller/InventoryPage";
 import ClientsPage from "./pages/Seller/ClientsPage";
 import SalesPage from "./pages/Seller/SalesPage";
+import InvoicesPage from "./pages/Seller/InvoicesPage";
 import CheckoutPage from "./pages/Seller/CheckoutPage";
 import SaleSuccessPage from "./pages/Seller/SaleSuccessPage";
+
+// Pages Contador
+import ContadorDashboardPage from "./pages/Contador/ContadorDashboardPage";
 
 function App() {
   return (
@@ -88,6 +97,12 @@ function App() {
             <Route path="taxes" element={<IvaPage />} />
             <Route path="profile" element={<AdminSettingsPage />} />
             <Route path="certificate" element={<CertificatesPage />} />
+            {/* Módulo Contabilidad */}
+            <Route path="sri-config" element={<SriConfigPage />} />
+            <Route path="proveedores" element={<ProveedoresPage />} />
+            <Route path="cuentas-por-pagar" element={<CuentasPorPagarPage />} />
+            <Route path="cuentas-bancarias" element={<CuentasBancariasPage />} />
+            <Route path="contabilidad" element={<ContabilidadPage />} />
           </Route>
 
           {/* === RUTAS PROTEGIDAS VENDEDOR === */}
@@ -98,12 +113,30 @@ function App() {
             <Route index element={<SellerDashboardPage />} />
             <Route path="profile" element={<SellerSettingsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
-            {/* 👇 Nueva ruta de categorías - accesible por URL pero sidebar lo oculta para vendedores */}
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="clients" element={<ClientsPage />} />
             <Route path="sales" element={<SalesPage />} />
+            <Route path="invoices" element={<InvoicesPage />} />
             <Route path="checkout" element={<CheckoutPage />} />
             <Route path="sale-success" element={<SaleSuccessPage />} />
+          </Route>
+
+          {/* === RUTAS PROTEGIDAS CONTADOR === */}
+          <Route
+            path="/contador"
+            element={<ProtectedRoute allowedRoles={["Contador"]} />}
+          >
+            <Route index element={<ContadorDashboardPage />} />
+            <Route path="dashboard" element={<ContadorDashboardPage />} />
+            <Route path="profile" element={<AdminSettingsPage />} />
+            {/* Acceso a módulos contables */}
+            <Route path="proveedores" element={<ProveedoresPage />} />
+            <Route path="cuentas-por-pagar" element={<CuentasPorPagarPage />} />
+            <Route path="cuentas-bancarias" element={<CuentasBancariasPage />} />
+            <Route path="contabilidad" element={<ContabilidadPage />} />
+            {/* Acceso de solo lectura a ventas y clientes */}
+            <Route path="clientes" element={<ClientsPage />} />
+            <Route path="ventas" element={<SalesPage />} />
           </Route>
 
           {/* === CATCH ALL === */}
@@ -115,3 +148,4 @@ function App() {
 }
 
 export default App;
+

@@ -15,11 +15,6 @@ module.exports = {
         allowNull: false,
         unique: true
       },
-      codigo_sri: {
-        type: Sequelize.STRING(2),
-        allowNull: false,
-        comment: 'Código oficial del SRI (0=0%, 2=12%, 4=15%, etc.)'
-      },
       porcentaje_iva: {
         type: Sequelize.INTEGER,
         allowNull: false
@@ -34,11 +29,9 @@ module.exports = {
         allowNull: false
       }
     }, {
-      schema: 'catalogo',
-      timestamps: false
+      schema: 'catalogo'
     });
   },
-
   async down(queryInterface, Sequelize) {
     await queryInterface.dropTable({ tableName: 'valor_iva', schema: 'catalogo' });
   }

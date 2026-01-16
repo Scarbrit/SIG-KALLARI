@@ -62,12 +62,12 @@ export default (sequelize, DataTypes) => {
             comment: 'Formato: 001-001-000000001'
         },
         clave_acceso_sri: {
-            type: DataTypes.STRING(50),
+            type: DataTypes.STRING(49),
             allowNull: true,
             unique: true
         },
         numero_autorizacion: {
-            type: DataTypes.STRING(50),
+            type: DataTypes.STRING(49),
             allowNull: true
         },
         fecha_emision: {
@@ -116,6 +116,28 @@ export default (sequelize, DataTypes) => {
         mensaje_sri: {
             type: DataTypes.TEXT,
             allowNull: true
+        },
+        // Campos para anulación
+        anulada: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+            comment: 'Indica si la factura fue anulada'
+        },
+        fecha_anulacion: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'Fecha en que se anuló la factura'
+        },
+        motivo_anulacion: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+            comment: 'Razón de la anulación'
+        },
+        id_usuario_anulacion: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            comment: 'Usuario que anuló la factura'
         }
     }, {
         tableName: 'factura',
@@ -125,15 +147,17 @@ export default (sequelize, DataTypes) => {
 
     Factura.associate = (models) => {
         Factura.belongsTo(models.Cliente, { foreignKey: 'id_cliente' });
-        Factura.belongsTo(models.Usuario, { foreignKey: 'id_vendedor' });
+        Factura.belongsTo(models.Usuario, { foreignKey: 'id_vendedor', as: 'vendedor' });
+        Factura.belongsTo(models.Usuario, { foreignKey: 'id_usuario_anulacion', as: 'usuario_anulacion' });
         Factura.belongsTo(models.EstadoSri, { foreignKey: 'id_estado_sri' });
         Factura.belongsTo(models.ValorIva, { foreignKey: 'id_valor_iva' });
-        Factura.belongsTo(models.MetodoPago, { foreignKey: 'id_metodo_pago' }); // ✅ USA TU MODELO EXISTENTE
+        Factura.belongsTo(models.MetodoPago, { foreignKey: 'id_metodo_pago' });
         Factura.hasMany(models.DetalleFactura, {
             foreignKey: 'id_factura',
-            as: 'DetalleFactura'  // ← Forzar nombre singular
+            as: 'DetalleFactura'
         });
         Factura.hasMany(models.CuentaPorCobrar, { foreignKey: 'id_factura' });
+        Factura.hasMany(models.AsientoContable, { foreignKey: 'id_factura' });
     };
 
     return Factura;

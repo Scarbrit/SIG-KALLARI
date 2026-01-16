@@ -77,12 +77,22 @@ export class SalesController {
         try {
             // req.validatedData contiene los query params validados
             const filtros = req.validatedData;
-            const ventas = await salesService.getSalesHistory(filtros);
+            const facturas = await salesService.getSalesHistory(filtros);
+
+            // Calcular totales para el resumen
+            const total_ventas = facturas.reduce((sum, f) => sum + parseFloat(f.total || 0), 0);
+            const total_subtotal = facturas.reduce((sum, f) => sum + parseFloat(f.subtotal_con_iva || 0) + parseFloat(f.subtotal_sin_iva || 0), 0);
+            const total_iva = facturas.reduce((sum, f) => sum + parseFloat(f.total_iva || 0), 0);
 
             res.status(200).json({
                 success: true,
-                count: ventas.length,
-                ventas
+                count: facturas.length,
+                facturas,
+                totales: {
+                    total_ventas,
+                    total_subtotal,
+                    total_iva
+                }
             });
         } catch (error) {
             res.status(500).json({

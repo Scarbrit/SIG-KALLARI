@@ -34,6 +34,14 @@ const menuItems = {
       icon: "license",
       path: "/admin/certificate",
     },
+    // --- Módulo Contabilidad ---
+    {
+      id: "sri-config",
+      label: "Config. SRI",
+      icon: "settings",
+      path: "/admin/sri-config",
+    },
+    
   ],
   seller: [
     { id: "dashboard", label: "Dashboard", icon: "dashboard", path: "/seller" },
@@ -77,22 +85,40 @@ const menuItems = {
       path: "/contador",
     },
     {
-      id: "sales",
-      label: "Ventas",
-      icon: "shopping_cart",
-      path: "/contador/sales",
+      id: "proveedores",
+      label: "Proveedores",
+      icon: "groups",
+      path: "/contador/proveedores",
     },
     {
-      id: "reports",
-      label: "Reportes",
-      icon: "assessment",
-      path: "/contador/reports",
+      id: "cuentas-por-pagar",
+      label: "Cuentas x Pagar",
+      icon: "receipt_long",
+      path: "/contador/cuentas-por-pagar",
     },
     {
-      id: "clients",
+      id: "cuentas-bancarias",
+      label: "Caja/Bancos",
+      icon: "account_balance",
+      path: "/contador/cuentas-bancarias",
+    },
+    {
+      id: "contabilidad",
+      label: "Contabilidad",
+      icon: "calculate",
+      path: "/contador/contabilidad",
+    },
+    {
+      id: "clientes",
       label: "Clientes",
       icon: "group",
-      path: "/contador/clients",
+      path: "/contador/clientes",
+    },
+    {
+      id: "ventas",
+      label: "Ventas",
+      icon: "shopping_cart",
+      path: "/contador/ventas",
     },
   ],
 };

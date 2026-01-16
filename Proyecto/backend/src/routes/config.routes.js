@@ -6,7 +6,10 @@ import { validateRequest } from '../middleware/validation.middleware.js';
 import { ROLES } from '../constants/codigos.js';
 import {
     TokenExpirationSchema,
-    BlockConfigSchema
+    BlockConfigSchema,
+    ConfiguracionSriSchema,
+    UpdateConfiguracionSriSchema,
+    CambiarAmbienteSriSchema
 } from '../schemas/config.schemas.js';
 
 const router = Router();
@@ -18,6 +21,68 @@ const adminAccess = [
     checkRole([ROLES.SUPERUSUARIO, ROLES.ADMINISTRADOR])
 ];
 
+// ==================== CONFIGURACIÓN SRI ====================
+
+/**
+ * @route   GET /api/config/sri
+ * @desc    Obtener configuración SRI actual
+ * @access  Privado (Admin/Superusuario)
+ */
+router.get(
+    '/sri',
+    adminAccess,
+    (req, res) => configController.obtenerConfiguracionSri(req, res)
+);
+
+/**
+ * @route   POST /api/config/sri
+ * @desc    Guardar configuración SRI (crear o actualizar completa)
+ * @access  Privado (Admin/Superusuario)
+ */
+router.post(
+    '/sri',
+    adminAccess,
+    validateRequest(ConfiguracionSriSchema),
+    (req, res) => configController.guardarConfiguracionSri(req, res)
+);
+
+/**
+ * @route   PUT /api/config/sri
+ * @desc    Actualizar parcialmente la configuración SRI
+ * @access  Privado (Admin/Superusuario)
+ */
+router.put(
+    '/sri',
+    adminAccess,
+    validateRequest(UpdateConfiguracionSriSchema),
+    (req, res) => configController.actualizarConfiguracionSri(req, res)
+);
+
+/**
+ * @route   PATCH /api/config/sri/ambiente
+ * @desc    Cambiar ambiente SRI (acción rápida: Pruebas/Producción)
+ * @access  Privado (Admin/Superusuario)
+ */
+router.patch(
+    '/sri/ambiente',
+    adminAccess,
+    validateRequest(CambiarAmbienteSriSchema),
+    (req, res) => configController.cambiarAmbienteSri(req, res)
+);
+
+/**
+ * @route   GET /api/config/sri/validar
+ * @desc    Validar que la configuración SRI esté completa
+ * @access  Privado (Admin/Superusuario)
+ */
+router.get(
+    '/sri/validar',
+    adminAccess,
+    (req, res) => configController.validarConfiguracionSri(req, res)
+);
+
+// ==================== TOKEN Y BLOQUEO ====================
+
 /**
  * @route   PUT /api/config/token-expiration
  * @desc    Actualizar tiempo de expiración del token JWT
@@ -26,7 +91,7 @@ const adminAccess = [
 router.put(
     '/token-expiration',
     adminAccess,
-    validateRequest(TokenExpirationSchema), // ✅ Validación Zod
+    validateRequest(TokenExpirationSchema),
     (req, res) => configController.actualizarTiempoExpiracion(req, res)
 );
 
@@ -38,13 +103,13 @@ router.put(
 router.put(
     '/block-config',
     adminAccess,
-    validateRequest(BlockConfigSchema), // ✅ Validación Zod
+    validateRequest(BlockConfigSchema),
     (req, res) => configController.actualizarConfigBloqueo(req, res)
 );
 
 /**
  * @route   GET /api/config
- * @desc    Obtener configuración actual del sistema
+ * @desc    Obtener configuración actual del sistema (completa)
  * @access  Privado (Admin/Superusuario)
  */
 router.get(

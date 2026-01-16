@@ -28,7 +28,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@xmldom/xmldom": "^0.8.11",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
@@ -52,7 +51,6 @@
     "sequelize": "^6.37.7",
     "soap": "^1.6.1",
     "xmlbuilder2": "^4.0.3",
-    "xpath": "^0.0.34",
     "zod": "^4.1.12"
   },
   "devDependencies": {

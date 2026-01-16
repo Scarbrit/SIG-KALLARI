@@ -42,7 +42,14 @@ export default (sequelize, DataTypes) => {
 
     PlanCuenta.associate = (models) => {
         PlanCuenta.hasMany(models.DetalleAsiento, { foreignKey: 'id_plan_cuenta' });
-        PlanCuenta.hasMany(models.PlanCuenta, { foreignKey: 'id_cuenta_padre' });
+        PlanCuenta.hasMany(models.PlanCuenta, {
+            foreignKey: 'id_cuenta_padre',
+            as: 'subcuentas'
+        });
+        PlanCuenta.belongsTo(models.PlanCuenta, {
+            foreignKey: 'id_cuenta_padre',
+            as: 'cuenta_padre'
+        });
     };
 
     return PlanCuenta;

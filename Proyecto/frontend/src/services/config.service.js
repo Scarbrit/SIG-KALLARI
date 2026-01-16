@@ -14,6 +14,70 @@ class ConfigService {
         }
     }
 
+    // ==================== CONFIGURACIÓN SRI ====================
+
+    /**
+     * Obtener configuración SRI
+     */
+    async getSriConfig() {
+        try {
+            const response = await axiosInstance.get('/config/sri');
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Guardar configuración SRI (crear o actualizar completa)
+     */
+    async saveSriConfig(data) {
+        try {
+            const response = await axiosInstance.post('/config/sri', data);
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Actualizar parcialmente configuración SRI
+     */
+    async updateSriConfig(data) {
+        try {
+            const response = await axiosInstance.put('/config/sri', data);
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Cambiar ambiente SRI (acción rápida)
+     */
+    async changeAmbiente(ambiente) {
+        try {
+            const response = await axiosInstance.patch('/config/sri/ambiente', { ambiente });
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    /**
+     * Validar que la configuración SRI esté completa
+     */
+    async validateSriConfig() {
+        try {
+            const response = await axiosInstance.get('/config/sri/validar');
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    // ==================== TOKEN Y BLOQUEO ====================
+
     /**
      * Actualizar tiempo de expiración del token
      */
@@ -27,6 +91,20 @@ class ConfigService {
             throw this.handleError(error);
         }
     }
+
+    /**
+     * Actualizar configuración de bloqueo
+     */
+    async updateBlockConfig(configData) {
+        try {
+            const response = await axiosInstance.put('/config/block-config', configData);
+            return response.data;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
+    // ==================== HELPERS ====================
 
     /**
      * Manejar errores de la API
@@ -82,18 +160,6 @@ class ConfigService {
     }
 
     /**
-   * Actualizar configuración de bloqueo
-   */
-    async updateBlockConfig(configData) {
-        try {
-            const response = await axiosInstance.put('/config/block-config', configData);
-            return response.data;
-        } catch (error) {
-            throw this.handleError(error);
-        }
-    }
-
-    /**
      * Convertir minutos a formato frontend
      */
     convertMinutesToFrontend(minutes) {
@@ -119,7 +185,6 @@ class ConfigService {
         }
         return durationNum;
     }
-
 }
 
 export const configService = new ConfigService();

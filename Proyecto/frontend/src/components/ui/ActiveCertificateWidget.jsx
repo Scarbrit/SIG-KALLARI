@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import axiosInstance from "../services/axios";
 import { Shield, AlertTriangle, CheckCircle, Calendar } from "lucide-react";
 
@@ -40,9 +41,9 @@ const ActiveCertificateWidget = () => {
             <p className="font-semibold text-red-900">Sin Certificado Activo</p>
             <p className="text-sm text-red-700 mt-1">
               No puedes emitir facturas sin un certificado digital.
-              <a href="/admin/certificates" className="underline ml-1">
+              <Link to="/admin/certificates" className="underline ml-1">
                 Subir certificado
-              </a>
+              </Link>
             </p>
           </div>
         </div>
@@ -117,9 +118,9 @@ const ActiveCertificateWidget = () => {
           {cert.estado === "expirado" && (
             <p className="text-xs text-red-700 mt-2">
               ❌ No puedes emitir facturas con un certificado expirado.
-              <a href="/admin/certificates" className="underline ml-1">
+              <Link to="/admin/certificates" className="underline ml-1">
                 Subir nuevo certificado
-              </a>
+              </Link>
             </p>
           )}
         </div>

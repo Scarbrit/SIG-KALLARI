@@ -34,7 +34,7 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
       Superusuario: "/admin",
       Administrador: "/admin",
       Vendedor: "/seller",
-      Contador: "/admin",
+      Contador: "/contador",
     };
 
     const targetPath = roleRoutes[user.rol] || "/";

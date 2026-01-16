@@ -10,11 +10,6 @@ export default (sequelize, DataTypes) => {
             allowNull: false,
             unique: true
         },
-        codigo_sri: {
-            type: DataTypes.STRING(2),
-            allowNull: false,
-            comment: 'Código oficial del SRI (0=0%, 2=12%, 4=15%, etc.)'
-        },
         porcentaje_iva: {
             type: DataTypes.INTEGER,
             allowNull: false
